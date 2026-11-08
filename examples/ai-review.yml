@@ -1,0 +1,41 @@
+# Copy this file to .github/workflows/ai-review.yml in ANY repository (any language).
+# Free by default: it uses GitHub Models with the built-in GITHUB_TOKEN. No API key or secret needed.
+name: AI code review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:            # comment "/review" on a PR to re-run the review
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  models: read              # lets GITHUB_TOKEN call GitHub Models (free)
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event_name == 'pull_request' || (github.event.issue.pull_request && startsWith(github.event.comment.body, '/review'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: SanthoshJeeva440/code-review@v1
+        # Everything below is optional.
+        with:
+          model: openai/gpt-4.1           # free; openai/gpt-4.1-mini gives more reviews per day
+          min_severity: low               # critical | high | medium | low | nit
+          max_comments: 25
+          fail_on: none                   # e.g. "high" to block merging on serious findings
+          exclude: |
+            docs/**
+          extra_instructions: |
+            Pay extra attention to security and error handling.
+
+          # Want higher-quality reviews later? Switch to Claude:
+          # provider: anthropic
+          # anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # model: claude-opus-5-5

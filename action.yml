@@ -1,0 +1,167 @@
+name: "AI Code Review (OpenAI API, GitHub Models or Claude)"
+description: "AI pull request reviews using OpenAI API, GitHub Models or Claude. Posts inline comments."
+author: "SanthoshJeeva440"
+branding:
+  icon: "eye"
+  color: "orange"
+
+inputs:
+  provider:
+    description: "github-models (free), openai (OpenAI API, needs openai_api_key), or anthropic (needs anthropic_api_key)."
+    required: false
+    default: "github-models"
+  anthropic_api_key:
+    description: "Anthropic API key, only for provider: anthropic. Store it as a secret."
+    required: false
+    default: ""
+  openai_api_key:
+    description: "OpenAI API key, only for provider: openai. Store it as a GitHub secret."
+    required: false
+    default: ""
+  github_token:
+    description: "Token used to read the PR, post the review and call GitHub Models. Needs pull-requests: write, contents: read and models: read."
+    required: false
+    default: ${{ github.token }}
+  model:
+    description: "Model ID. Defaults: openai/gpt-4.1 for GitHub Models, gpt-4.1-mini for OpenAI API, and claude-opus-5-5 for Anthropic."
+    required: false
+    default: ""
+  pr_number:
+    description: "PR number to review. Detected from the event when empty."
+    required: false
+    default: ""
+  min_severity:
+    description: "Lowest severity to report: critical, high, medium, low or nit."
+    required: false
+    default: "low"
+  max_comments:
+    description: "Maximum number of inline comments per review (highest severity first)."
+    required: false
+    default: "25"
+  fail_on:
+    description: "Fail the check when a finding is at or above this severity (critical, high, medium, low, nit). 'none' never fails."
+    required: false
+    default: "none"
+  request_changes_on:
+    description: "Submit the review as 'Request changes' when a finding is at or above this severity. 'none' always comments."
+    required: false
+    default: "none"
+  include:
+    description: "Comma or newline separated glob patterns. When set, only matching files are reviewed."
+    required: false
+    default: ""
+  exclude:
+    description: "Comma or newline separated glob patterns to skip, added to the built-in list (lockfiles, build output, images, ...)."
+    required: false
+    default: ""
+  use_default_excludes:
+    description: "Use the built-in exclude list."
+    required: false
+    default: "true"
+  guidelines_files:
+    description: "Files read from the BASE branch with project-specific review rules. First ones found are all used."
+    required: false
+    default: ".github/code-review.md,REVIEW_GUIDELINES.md,CLAUDE.md,AGENTS.md,.github/copilot-instructions.md"
+  extra_instructions:
+    description: "Extra review instructions, e.g. 'Focus on security. We use Django 5.'"
+    required: false
+    default: ""
+  include_full_files:
+    description: "Send the full content of changed files as context (better reviews, more tokens). Default: false for github-models, true for anthropic."
+    required: false
+    default: ""
+  max_files:
+    description: "Maximum number of files to review in one PR."
+    required: false
+    default: "100"
+  max_chars_per_request:
+    description: "Approximate characters of diff+context per model request. Larger PRs are split into several requests. Default: 16000 for github-models (free-tier limit), 120000 for anthropic."
+    required: false
+    default: ""
+  max_output_tokens:
+    description: "Max output tokens per model request. Default: 4000 for github-models, 8000 for anthropic."
+    required: false
+    default: ""
+  concurrency:
+    description: "How many model requests to run in parallel for large PRs. Default: 1 for github-models, 3 for anthropic."
+    required: false
+    default: ""
+  review_drafts:
+    description: "Review draft PRs too."
+    required: false
+    default: "false"
+  skip_label:
+    description: "PRs with this label are not reviewed."
+    required: false
+    default: "skip-ai-review"
+  comment_trigger:
+    description: "A PR comment starting with this text triggers a review (needs the issue_comment event)."
+    required: false
+    default: "/review"
+  comment_trigger_roles:
+    description: "Author associations allowed to trigger a review by comment."
+    required: false
+    default: "OWNER,MEMBER,COLLABORATOR"
+  rereview_same_commit:
+    description: "Review again even if this exact commit already has a Claude review."
+    required: false
+    default: "false"
+  dry_run:
+    description: "Print the review to the log and job summary instead of posting it."
+    required: false
+    default: "false"
+  models_api_url:
+    description: "Override the GitHub Models chat completions URL."
+    required: false
+    default: "https://models.github.ai/inference/chat/completions"
+  anthropic_api_url:
+    description: "Override the Messages API URL (e.g. for a proxy/gateway)."
+    required: false
+    default: "https://api.anthropic.com/v1/messages"
+
+outputs:
+  findings:
+    description: "Number of findings reported."
+    value: ${{ steps.review.outputs.findings }}
+  worst_severity:
+    description: "Highest severity found, or 'none'."
+    value: ${{ steps.review.outputs.worst_severity }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Review pull request with AI
+      id: review
+      shell: bash
+      env:
+        PYTHONPATH: ${{ github.action_path }}
+        PYTHONDONTWRITEBYTECODE: "1"
+        INPUT_PROVIDER: ${{ inputs.provider }}
+        INPUT_MODELS_API_URL: ${{ inputs.models_api_url }}
+        INPUT_ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        INPUT_OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github_token }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+        INPUT_MIN_SEVERITY: ${{ inputs.min_severity }}
+        INPUT_MAX_COMMENTS: ${{ inputs.max_comments }}
+        INPUT_FAIL_ON: ${{ inputs.fail_on }}
+        INPUT_REQUEST_CHANGES_ON: ${{ inputs.request_changes_on }}
+        INPUT_INCLUDE: ${{ inputs.include }}
+        INPUT_EXCLUDE: ${{ inputs.exclude }}
+        INPUT_USE_DEFAULT_EXCLUDES: ${{ inputs.use_default_excludes }}
+        INPUT_GUIDELINES_FILES: ${{ inputs.guidelines_files }}
+        INPUT_EXTRA_INSTRUCTIONS: ${{ inputs.extra_instructions }}
+        INPUT_INCLUDE_FULL_FILES: ${{ inputs.include_full_files }}
+        INPUT_MAX_FILES: ${{ inputs.max_files }}
+        INPUT_MAX_CHARS_PER_REQUEST: ${{ inputs.max_chars_per_request }}
+        INPUT_MAX_OUTPUT_TOKENS: ${{ inputs.max_output_tokens }}
+        INPUT_CONCURRENCY: ${{ inputs.concurrency }}
+        INPUT_REVIEW_DRAFTS: ${{ inputs.review_drafts }}
+        INPUT_SKIP_LABEL: ${{ inputs.skip_label }}
+        INPUT_COMMENT_TRIGGER: ${{ inputs.comment_trigger }}
+        INPUT_COMMENT_TRIGGER_ROLES: ${{ inputs.comment_trigger_roles }}
+        INPUT_REREVIEW_SAME_COMMIT: ${{ inputs.rereview_same_commit }}
+        INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        INPUT_ANTHROPIC_API_URL: ${{ inputs.anthropic_api_url }}
+      run: python3 -m reviewer.main

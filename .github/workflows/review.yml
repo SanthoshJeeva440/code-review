@@ -1,0 +1,82 @@
+# Reusable workflow. Other repositories call it with:
+#   uses: SanthoshJeeva440/code-review/.github/workflows/review.yml@v1
+name: AI code review (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      provider:
+        type: string
+        default: github-models
+      model:
+        type: string
+        default: ""
+      min_severity:
+        type: string
+        default: low
+      max_comments:
+        type: number
+        default: 25
+      fail_on:
+        type: string
+        default: none
+      exclude:
+        type: string
+        default: ""
+      include:
+        type: string
+        default: ""
+      extra_instructions:
+        type: string
+        default: ""
+      review_drafts:
+        type: boolean
+        default: false
+      action_ref:
+        description: "Branch or tag of SanthoshJeeva440/code-review to run. Keep it equal to the ref you call this workflow at."
+        type: string
+        default: main
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: false
+      OPENAI_API_KEY:
+        required: false
+    outputs:
+      findings:
+        value: ${{ jobs.review.outputs.findings }}
+      worst_severity:
+        value: ${{ jobs.review.outputs.worst_severity }}
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      models: read
+    outputs:
+      findings: ${{ steps.claude.outputs.findings }}
+      worst_severity: ${{ steps.claude.outputs.worst_severity }}
+    steps:
+      - name: Check out the review agent
+        uses: actions/checkout@v4
+        with:
+          repository: SanthoshJeeva440/code-review
+          ref: ${{ inputs.action_ref }}
+          path: .claude-code-review
+      - name: Review pull request
+        id: claude
+        uses: ./.claude-code-review
+        with:
+          provider: ${{ inputs.provider }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ inputs.model }}
+          min_severity: ${{ inputs.min_severity }}
+          max_comments: ${{ inputs.max_comments }}
+          fail_on: ${{ inputs.fail_on }}
+          exclude: ${{ inputs.exclude }}
+          include: ${{ inputs.include }}
+          extra_instructions: ${{ inputs.extra_instructions }}
+          review_drafts: ${{ inputs.review_drafts }}

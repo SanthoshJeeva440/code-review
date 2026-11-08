@@ -1,0 +1,17 @@
+# Alternative: call the reusable workflow instead of the action (less YAML in your repo).
+name: AI code review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+  pull-requests: write
+  models: read
+jobs:
+  review:
+    uses: SanthoshJeeva440/code-review/.github/workflows/review.yml@v1
+    with:
+      action_ref: v1
+      # provider: anthropic        # uncomment (and pass the secret below) to use Claude
+    # secrets:
+    #   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
